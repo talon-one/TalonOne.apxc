@@ -1,0 +1,91 @@
+public class TalonOneManagementAPI {
+  private String token;    
+  private String email;
+  private String password;
+  private String subdomain;
+  private Integer appId = 1;
+  private Integer campaignId = 1;
+    
+  public TalonOneManagementAPI(String subdomain, String email, String password, Integer appId, Integer campaignId) {
+    this.subdomain = subdomain;
+    this.appId = appId;
+    this.campaignId = campaignId;
+    this.email = email;
+    this.password = password;
+  }
+    
+	public Boolean CreateSession() {
+    Map<String, String> credentials = new Map<String, String>{};
+		credentials.put('email', email);
+		credentials.put('password', password);
+    String json = System.JSON.serialize(credentials);
+        
+    Http http = new Http();
+		HttpRequest req = new HttpRequest();
+    req.setEndpoint('https://'+subdomain+'.talon.one/v1/sessions');
+    req.setMethod('POST');
+    req.setBody(json);
+        
+    try {
+      HttpResponse res = http.send(req);
+      Map<String, Object> m = (Map<String, Object>)System.JSON.deserializeUntyped(res.getBody());
+      token = (String)m.get('token');
+      return true;
+    } catch (System.CalloutException e) {
+      System.debug('Callout exception: '+e);
+    }
+    return false;
+  }
+    
+  public void DeleteSession() {
+    Http http = new Http();
+		HttpRequest req = new HttpRequest();
+    req.setEndpoint('https://'+subdomain+'.talon.one/v1/sessions');
+    req.setMethod('DELETE');
+    try {
+      HttpResponse res = http.send(req);
+    } catch (System.CalloutException e) {
+      System.debug('Callout exception: '+e);
+    }
+  }
+    
+  public String CreateNewCoupon() {
+    Map<String, Object> couponReq = new Map<String, Object>{};
+		couponReq.put('usageLimit', 1);
+		couponReq.put('numberOfCoupons', 1);
+		couponReq.put('couponPattern', 'DEAL-####-####');
+    couponReq.put('validCharacters', new String[]{'1','2','3','4','5','6','7','8','9','A','B','C','D','E','F','G','H','J','K','L','M','N','P','Q','R','S','T','U','V','W','X','Y','Z'});
+        
+    String json = System.JSON.serialize(couponReq);
+        
+    Http http = new Http();
+    HttpRequest req = new HttpRequest();
+    req.setHeader('Authorization','Bearer '+token);
+    req.setEndpoint('https://'+subdomain+'.talon.one/v1/applications/'+appId+'/campaigns/'+campaignId+'/coupons');
+    req.setMethod('POST');
+    req.setBody(json);
+        
+    try {
+      HttpResponse res = http.send(req);
+      Map<String, Object> m = (Map<String, Object>)System.JSON.deserializeUntyped(res.getBody());
+      System.debug(m);
+            
+      Object[] objs = (Object[])m.get('data');
+      Map<String, Object> coupon = (Map<String, Object>)objs[0];
+            
+      System.debug('CreateNewCoupon: '+coupon.get('value'));
+      return (String)coupon.get('value');
+    } catch (System.CalloutException e) {
+      System.debug('Callout exception: '+e);
+    }
+    return NULL;
+  }
+    
+  public void TestCreateNewCoupon() {
+    if (CreateSession()) {
+      String coupon = CreateNewCoupon();
+      ApexPages.addMessage(new ApexPages.Message(ApexPages.Severity.INFO, 'Talon.One Coupon: '+coupon));
+      DeleteSession();
+    }
+  }
+}
